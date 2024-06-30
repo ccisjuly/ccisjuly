@@ -1,4 +1,3 @@
-# My-personal-repository.
 # Shawn T
 
 👋 Hi, I'm Shawn, a passionate Software Engineer with extensive experience in front-end development, product research, and operations. I specialize in building scalable applications using modern web technologies.
