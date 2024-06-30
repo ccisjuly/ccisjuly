@@ -10,9 +10,3 @@
 - **Methodologies:** Agile Project Management, TDD, CI/CD
 - **Technologies:** REST, GraphQL, Microservices, Cloud Computing, API Development
 - **Other:** Full-Stack Development, AI, PCI-DSS, OAuth, OpenID, SDLC, Cross-Functional Collaboration
-
-## 📫 Connect with Me
-
-- [LinkedIn](https://www.linkedin.com/in/shawntsai)
-- [GitHub](https://github.com/ccisjuly)
-
