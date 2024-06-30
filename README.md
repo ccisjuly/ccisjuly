@@ -7,6 +7,3 @@
 - **Languages:** JavaScript, TypeScript, HTML, CSS, PHP, SQL, Java, Python
 - **Frameworks & Libraries:** Vue.js, Nuxt.js, Next.js, Koa.js, Node.js, Laravel, React Native, React, Angular
 - **Tools & Platforms:** Git, Cypress, Jest, Docker, AWS, Webpack, Kubernetes, Redux
-- **Methodologies:** Agile Project Management, TDD, CI/CD
-- **Technologies:** REST, GraphQL, Microservices, Cloud Computing, API Development
-- **Other:** Full-Stack Development, AI, PCI-DSS, OAuth, OpenID, SDLC, Cross-Functional Collaboration
