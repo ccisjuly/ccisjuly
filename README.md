@@ -4,7 +4,7 @@
 
 ## Project
 
-- **Project1: DIDI Takeaway backend system:** [官网](https://www.didi-food.com/en-US/food/)
+- **Project1: DIDI Takeaway backend system:** [website](https://www.didi-food.com/en-US/food/)
 - Business: takeout system, marketing system, performance testing system, data reporting system, and audit system.
 - Technology: Vue.js, Nuxt.js, Koa.js, Node.js, PWA.
 - Team: Responsible for leading a 4-person technical team, including program design, personnel management, and business docking.
