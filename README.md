@@ -1,6 +1,15 @@
 # Shawn T
 
-👋 Hi, I'm Shawn, 7 years of work experience, a passionate Software Engineer with extensive experience in front-end development, product research, and operations. I specialize in building scalable applications using modern web technologies.
+👋 Hi, I'm Shawn, 7 years of work experience, led a team of more than 15 people, a passionate Software Engineer with extensive experience in front-end development, product research, and operations. I specialize in building scalable applications using modern web technologies. I once founded an AI company, But there is no good job, so I am looking for a new job opportunity now.
+
+- 🎮: Playing games is one of my favorite pastimes, especially sandbox games like Anno 1800, CS:GO, and Horizon 4.
+- ⛷️: Skiing is another hobby I enjoy, though I stick to beginner and intermediate tracks.
+- 🏎️: Driving a go-kart on the track was an exciting experience! 
+- ⛺: Making friends and exploring new things, such as going camping, is something I love. 
+- 🌲: Enjoying a drink and chatting with friends while appreciating nature is always a pleasure. 
+- 📚: In addition, I have a passion for reading history and science fiction books, and watching documentaries, especially "Planets" and "Planet Earth."
+
+Welcome to make friends with everyone. you can find the contact information at left side! 😊
 
 ## Project
 
