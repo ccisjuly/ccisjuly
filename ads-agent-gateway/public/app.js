@@ -11,96 +11,156 @@ const NAV = [
   { path: 'mcp', label: 'MCP 接入', icon: '⇄' },
 ];
 
+// 控制项编号：网关检查链中每一步对应的内控点
+const CONTROLS = {
+  身份认证: 'IAM-01', 资产范围: 'IAM-02', 操作权限: 'IAM-03',
+  受保护对象: 'AST-01', 禁止删除: 'AST-02',
+  单次涨幅: 'SPD-01', 账户日预算上限: 'SPD-02', 频率限制: 'SPD-03',
+  人工审批: 'CHG-01',
+};
+
+const RISK = { high: '高风险', medium: '中风险', low: '低风险' };
+
+// 合规演练：每个场景都是一次真实的网关调用
+const SCENARIO_GROUPS = [
+  { key: 'spend', title: '花费风控', desc: '防止 Agent 因误操作或策略失控造成超支' },
+  { key: 'access', title: '访问治理', desc: '跨组织授权、最小权限与 Agent 身份生命周期' },
+  { key: 'asset', title: '资产保护', desc: '核心广告资产与不可逆操作的保护' },
+  { key: 'change', title: '变更管理', desc: '分级审批：低风险自动放行，高风险人工确认' },
+];
+
 const SCENARIOS = [
   {
-    key: 'ok', title: '正常调价', expect: 'allowed',
-    story: '优化 Agent 把「冲锋衣-再营销」日预算 $1,200 → $1,380（+15%）',
+    key: 'ok', group: 'change', risk: 'low', control: 'CHG-01', expect: 'allowed',
+    title: '低风险调价自动放行',
+    story: '投放优化 Agent 将「冲锋衣-再营销」日预算由 $1,200 调至 $1,380（+15%）。',
+    impact: '在策略范围内自动执行并完整留痕，不占用人工审批。',
     agentId: 'agt_optimizer', tool: 'update_budget', args: { campaign_id: 'cmp_1002', daily_budget: 1380 },
   },
   {
-    key: 'typo', title: '手滑多打两个零', expect: 'denied',
-    story: '优化 Agent 把「冲锋衣-再营销」日预算改成 $120,000',
+    key: 'typo', group: 'spend', risk: 'high', control: 'SPD-01', expect: 'denied',
+    title: '预算误操作：多输两个零',
+    story: '投放优化 Agent 将「冲锋衣-再营销」日预算改为 $120,000。',
+    impact: '单次涨幅超过上限即拦截，在执行前阻止当日大额超支。',
     agentId: 'agt_optimizer', tool: 'update_budget', args: { campaign_id: 'cmp_1002', daily_budget: 120000 },
   },
   {
-    key: 'big', title: '大额调价要审批', expect: 'pending',
-    story: '优化 Agent 把「帐篷-新客拓展」日预算 $1,500 → $2,200（+$700）',
-    agentId: 'agt_optimizer', tool: 'update_budget', args: { campaign_id: 'cmp_1003', daily_budget: 2200 },
-  },
-  {
-    key: 'cap', title: '突破账户日预算上限', expect: 'denied',
-    story: '极光内部 Agent 把 TikTok「直播间引流」$1,100 → $1,600，账户合计将超过 $2,400 上限',
+    key: 'cap', group: 'spend', risk: 'high', control: 'SPD-02', expect: 'denied',
+    title: '突破账户日预算上限',
+    story: '极光内部 Agent 将 TikTok「直播间引流」由 $1,100 调至 $1,600，账户活跃预算合计将超过 $2,400。',
+    impact: '账户级预算硬上限：即使每次调整都不大，累计也不能突破上限。',
     agentId: 'agt_inhouse', tool: 'update_budget', args: { campaign_id: 'cmp_2002', daily_budget: 1600 },
   },
   {
-    key: 'brand', title: '误关品牌词广告', expect: 'denied',
-    story: '优化 Agent 想暂停「品牌词-搜索保护」',
-    agentId: 'agt_optimizer', tool: 'pause_campaign', args: { campaign_id: 'cmp_1001' },
-  },
-  {
-    key: 'partner', title: '代理商越权改预算', expect: 'denied',
-    story: '优化 Agent 修改星禾美妆「口红-新客」预算，但品牌方只给代理商开了只读',
+    key: 'partner', group: 'access', risk: 'high', control: 'IAM-03', expect: 'denied',
+    title: '代理商超出品牌授权',
+    story: '投放优化 Agent 尝试修改星禾美妆「口红-新客」预算，而品牌方仅授予代理商只读权限。',
+    impact: '有效权限取 Agent 角色与品牌授权的交集，代理商无法突破品牌方设定的边界。',
     agentId: 'agt_optimizer', tool: 'update_budget', args: { campaign_id: 'cmp_3001', daily_budget: 650 },
   },
   {
-    key: 'unauth', title: '访问未授权账户', expect: 'denied',
-    story: '优化 Agent 查看星禾美妆 TikTok 账户，品牌方没有授权给代理商',
+    key: 'unauth', group: 'access', risk: 'high', control: 'IAM-02', expect: 'denied',
+    title: '访问未授权的品牌账户',
+    story: '投放优化 Agent 尝试读取星禾美妆 TikTok 账户，品牌方未向代理商授权该账户。',
+    impact: '未授权资产不可读取，不同客户之间的数据严格隔离。',
     agentId: 'agt_optimizer', tool: 'list_campaigns', args: { account_id: 'act_tt_stella_sea' },
   },
   {
-    key: 'readonly', title: '只读 Agent 越界', expect: 'denied',
-    story: '数据日报 Agent（只读角色）试图暂停「直播间引流」',
+    key: 'readonly', group: 'access', risk: 'medium', control: 'IAM-03', expect: 'denied',
+    title: '只读 Agent 执行写操作',
+    story: '数据日报 Agent（分析师角色）尝试暂停「直播间引流」。',
+    impact: '最小权限原则：报表类 Agent 只能读取数据，不能改动投放。',
     agentId: 'agt_reporter', tool: 'pause_campaign', args: { campaign_id: 'cmp_2002' },
   },
   {
-    key: 'delete', title: '误删广告系列', expect: 'denied',
-    story: '新品上架 Agent 要删除「黑五预热-测试」',
+    key: 'offboard', group: 'access', risk: 'high', control: 'IAM-01', expect: 'denied',
+    title: '离职人员遗留的 Agent',
+    story: '负责人已离职的「历史投放 Agent」仍持有令牌，尝试修改「帐篷-新客拓展」预算。',
+    impact: 'Agent 随负责人离职一并停用，遗留令牌立即失效。',
+    agentId: 'agt_legacy', tool: 'update_budget', args: { campaign_id: 'cmp_1003', daily_budget: 1800 },
+  },
+  {
+    key: 'brand', group: 'asset', risk: 'high', control: 'AST-01', expect: 'denied',
+    title: '暂停品牌词广告',
+    story: '投放优化 Agent 为节省预算，尝试暂停「品牌词-搜索保护」。',
+    impact: '品牌词等核心资产受保护，避免品牌流量被竞品截获。',
+    agentId: 'agt_optimizer', tool: 'pause_campaign', args: { campaign_id: 'cmp_1001' },
+  },
+  {
+    key: 'delete', group: 'asset', risk: 'high', control: 'AST-02', expect: 'denied',
+    title: '删除广告系列',
+    story: '新品上架 Agent 尝试删除「黑五预热-测试」。',
+    impact: '删除不可恢复且会丢失历史数据，策略要求改用暂停。',
     agentId: 'agt_launcher', tool: 'delete_campaign', args: { campaign_id: 'cmp_1004' },
   },
   {
-    key: 'create', title: '新建广告系列', expect: 'pending',
-    story: '新品上架 Agent 新建「冲锋衣-黑五大促」，日预算 $400',
+    key: 'big', group: 'change', risk: 'medium', control: 'CHG-01', expect: 'pending',
+    title: '大额调价进入审批',
+    story: '投放优化 Agent 将「帐篷-新客拓展」日预算由 $1,500 调至 $2,200（+$700，超过 $500 审批阈值）。',
+    impact: '生成审批单，由投放主管确认后网关代为执行；Agent 无法审批自己的请求。',
+    agentId: 'agt_optimizer', tool: 'update_budget', args: { campaign_id: 'cmp_1003', daily_budget: 2200 },
+  },
+  {
+    key: 'create', group: 'change', risk: 'medium', control: 'CHG-01', expect: 'pending',
+    title: '新建广告系列需审批',
+    story: '新品上架 Agent 申请新建「冲锋衣-黑五大促」，日预算 $400。',
+    impact: '新增投放须经人工确认，避免计划外的预算流出。',
     agentId: 'agt_launcher', tool: 'create_campaign', args: { account_id: 'act_meta_aurora_us', name: '冲锋衣-黑五大促', daily_budget: 400 },
   },
 ];
 
-const NEEDS = [
+const CAPABILITIES = [
   {
-    icon: '💸', title: '防止 Agent 乱花钱',
-    pain: 'Agent 手滑多打两个零、连续加预算，钱当天就花出去了，追不回来。',
-    solution: '广告语义级护栏：单次涨幅上限、账户日预算总上限、每小时变更次数上限。网关看得懂「改成多少钱、涨了多少」，不只是看工具名。',
-    link: 'policies', linkText: '看规则护栏',
+    code: 'IAM', title: 'Agent 身份与生命周期', link: 'access',
+    summary: '每个 Agent 都是可识别、可追责、可回收的独立身份。',
+    points: ['独立身份，绑定所属组织与责任人', '网关令牌接入，广告平台凭证集中托管', '一键停用，负责人离职即回收'],
   },
   {
-    icon: '✋', title: '高风险操作必须有人把关',
-    pain: '大额调价、新建广告这类动作，全交给 Agent 不放心，全靠人工又失去了自动化的意义。',
-    solution: '超过阈值自动转人工审批，批准后由网关执行；小额日常调整自动放行，不打扰人。',
-    link: 'approvals', linkText: '看审批中心',
+    code: 'IAM', title: '跨组织授权', link: 'access',
+    summary: '沿用 Business Center 模式，覆盖品牌方、代理商、Agent 三级授权。',
+    points: ['品牌方按账户、按角色授权给代理商', '有效权限 = Agent 角色 ∩ 品牌授权，实时生效', '权限矩阵可视化，授权随时收回'],
   },
   {
-    icon: '⛓', title: '品牌方 × 代理商多方授权',
-    pain: '品牌方把账户交给代理商，代理商又交给 Agent，谁能动哪个账户、能动到什么程度，说不清。',
-    solution: '沿用 Business Center 的思路：品牌方把账户按角色授权给代理商，代理商再分配给 Agent，有效权限取两者交集，品牌方随时可收回。',
-    link: 'access', linkText: '看组织与授权',
+    code: 'SPD', title: '业务语义策略引擎', link: 'policies',
+    summary: '理解金额、涨幅与资产标签，而不只是工具名称。',
+    points: ['单次涨幅、账户日预算上限、变更频率', '品牌词等核心资产保护，禁止不可逆操作', '按账户配置，保存后对所有 Agent 生效'],
   },
   {
-    icon: '🌐', title: '跨平台一套规则',
-    pain: 'Meta、TikTok 各有各的权限设置，代理商同时投多个平台，规则散落在各处。',
-    solution: '一个网关同时接入 Meta / TikTok（后续可接 Amazon、Google），权限、护栏、审批、审计统一管理。',
-    link: 'accounts', linkText: '看广告账户',
+    code: 'CHG', title: '分级审批与职责分离', link: 'approvals',
+    summary: '低风险自动执行，高风险转人工确认。',
+    points: ['按金额阈值与操作类型自动分级', 'Agent 不能审批自己的请求', '飞书 / 企业微信 / 钉钉审批推送（规划中）'],
   },
   {
-    icon: '↺', title: '出了事说得清、改得回',
-    pain: 'Agent 改了什么、谁授权的、什么时候改的，事后查不到；改错了只能手动一个个恢复。',
-    solution: '每次调用都记录完整检查链和变更前后快照，放行的变更支持一键回滚；异常 Agent 可一键停用（Kill Switch）。',
-    link: 'audit', linkText: '看审计日志',
+    code: 'AUD', title: '审计、回滚与追责', link: 'audit',
+    summary: '每一次调用都能追溯到 Agent、责任人和命中的控制项。',
+    points: ['完整检查链与变更前后快照', '已执行的变更一键回滚', '审计导出与 SIEM 对接（规划中）'],
   },
   {
-    icon: '🔑', title: '平台凭证不交给 Agent',
-    pain: '每个 Agent 都拿着广告平台的长期 token，泄露一个就全盘失守。',
-    solution: 'Agent 只拿网关发的身份 token，平台凭证集中托管在网关；Agent 看到的工具列表也按权限过滤，看不到就调不了。',
-    link: 'mcp', linkText: '看 MCP 接入',
+    code: 'INT', title: '标准接入与跨平台', link: 'mcp',
+    summary: '一个接入点覆盖多个广告平台和任意 MCP Agent。',
+    points: ['标准 MCP 协议，兼容 Claude 等 Agent', 'Meta、TikTok 已接入，Amazon、Google 规划中', '工具列表按权限裁剪，看不到就调不了'],
   },
+];
+
+const CONTROL_CHAIN = [
+  ['IAM-01', '身份认证'], ['IAM-02', '资产范围'], ['IAM-03', '最小权限'],
+  ['AST', '资产保护'], ['SPD', '花费策略'], ['CHG-01', '分级审批'], ['AUD', '审计留痕'],
+];
+
+const STAKEHOLDERS = [
+  { role: '品牌方 · 市场负责人', value: '账户交给代理商和 AI 也不失控：授权边界由品牌方定义，可随时收回，所有变更可查。' },
+  { role: '代理商 · 管理层', value: '在多客户、多平台上规模化使用 Agent，误操作在执行前被拦截，避免赔付和客户信任损失。' },
+  { role: '安全 / IT 负责人', value: 'Agent 身份、最小权限、凭证托管与审计留痕，满足内控与合规审计要求。' },
+  { role: '财务 / 预算负责人', value: '账户级预算硬上限加大额审批，广告花费不会因 Agent 失误突破预算。' },
+];
+
+const READINESS = [
+  { area: '广告平台', items: [['Meta Ads', 1], ['TikTok Ads', 1], ['Amazon Ads', 0], ['Google Ads', 0]] },
+  { area: 'Agent 接入', items: [['MCP（Streamable HTTP）', 1], ['Claude 及任意 MCP 客户端', 1], ['OAuth 2.1 授权', 0]] },
+  { area: '审批协同', items: [['控制台审批', 1], ['飞书', 0], ['企业微信', 0], ['钉钉', 0]] },
+  { area: '身份与安全', items: [['一键停用', 1], ['SSO（Okta / Entra ID / 飞书）', 0], ['SCIM 用户同步', 0], ['凭证加密托管（KMS）', 0]] },
+  { area: '审计与合规', items: [['全量审计与回滚', 1], ['审计导出', 0], ['SIEM 对接', 0], ['等保 2.0 / SOC 2 对齐', 0]] },
+  { area: '部署方式', items: [['SaaS', 0], ['私有化部署', 0], ['专属云 / 数据驻留', 0]] },
 ];
 
 const ARG_TEMPLATES = {
@@ -168,7 +228,7 @@ function renderChecks(checks) {
   const icon = { pass: '✓', fail: '✕', review: '⏸' };
   return `<ol class="checks">${checks.map((c) => `
     <li class="ck-${c.status}"><span class="ck-icon">${icon[c.status]}</span>
-      <div><b>${esc(c.name)}</b><span>${esc(c.detail)}</span></div></li>`).join('')}</ol>`;
+      <div><b>${CONTROLS[c.name] ? `<code class="ctl">${CONTROLS[c.name]}</code>` : ''}${esc(c.name)}</b><span>${esc(c.detail)}</span></div></li>`).join('')}</ol>`;
 }
 
 function renderResult(e) {
@@ -182,95 +242,148 @@ function renderResult(e) {
     </div>`;
 }
 
+// 演练场景的精简结果：判定 + 是否符合预期 + 关键原因，完整检查链折叠
+function renderDrillResult(sc, e) {
+  if (!e) return '';
+  const key = e.checks.find((c) => c.status !== 'pass') || e.checks.at(-1);
+  const met = e.decision === sc.expect;
+  return `
+    <div class="drill-result">
+      <div class="dr-head">${badge(e.decision)}
+        <span class="${met ? 'met' : 'unmet'}">${met ? '✓ 符合预期' : '✕ 与预期不符'}</span>
+        ${e.savedUsd ? `<span class="saved">拦下日预算增量 ${usd(e.savedUsd)}</span>` : ''}
+      </div>
+      <div class="dr-reason">${CONTROLS[key.name] ? `<code class="ctl">${CONTROLS[key.name]}</code>` : ''}${esc(key.name)}：${esc(key.detail)}</div>
+      <details><summary>完整检查链（${e.checks.length} 步）</summary>${renderChecks(e.checks)}</details>
+    </div>`;
+}
+
+function drillReport() {
+  const done = SCENARIOS.filter((sc) => scenarioResults[sc.key]);
+  if (!done.length) return '';
+  const rs = done.map((sc) => scenarioResults[sc.key]);
+  const n = (d) => rs.filter((e) => e.decision === d).length;
+  const met = done.filter((sc) => scenarioResults[sc.key].decision === sc.expect).length;
+  const saved = rs.reduce((s, e) => s + (e.savedUsd || 0), 0);
+  return `
+    <div class="report">
+      <div class="report-title">演练报告 <span class="sub">${done.length} / ${SCENARIOS.length} 项已运行</span></div>
+      <div class="report-grid">
+        <div><b class="${met === done.length ? 'ok' : 'bad'}">${met} / ${done.length}</b><span>符合预期</span></div>
+        <div><b class="bad">${n('denied')}</b><span>高风险操作被拦截</span></div>
+        <div><b class="warn">${n('pending')}</b><span>转人工审批</span></div>
+        <div><b class="ok">${n('allowed')}</b><span>低风险自动放行</span></div>
+        <div><b class="brand">${usd(saved)}</b><span>拦下的日预算增量</span></div>
+        <div><b>${rs.length} / ${rs.length}</b><span>调用已写入审计</span></div>
+      </div>
+    </div>`;
+}
+
 // ---------- 页面：首页 ----------
 function pageHome() {
   const s = S.stats;
+  const managedBudget = Object.values(S.policies).reduce((t, p) => t + p.accountDailyCap, 0);
   return `
   <section class="hero">
-    <div class="hero-tag">${window.STATIC_DEMO ? '在线预览版 · 网关逻辑在浏览器内运行，刷新页面数据会重置' : '本地演示原型'} · 所有公司和数据均为虚构</div>
-    <h1>让 AI Agent 安全地操作广告账户</h1>
-    <p class="lead">一个放在 Agent 和 Meta / TikTok 广告平台之间的管控网关：每一次改预算、开关广告、新建删除，都先过 <b>权限</b>、<b>预算护栏</b> 和 <b>人工审批</b>，全程留痕，改错了 <b>一键回滚</b>。</p>
-    <div class="hero-actions">
-      <button class="btn primary" onclick="document.getElementById('scenarios').scrollIntoView({behavior:'smooth'})">一键体验典型场景 ↓</button>
-      <a class="btn" href="#simulator">打开 Agent 模拟器</a>
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">AI Agent 治理 · 广告投放</div>
+        <h1>广告 AI Agent 的企业级治理平台</h1>
+        <p class="lead">为品牌方与代理商提供 Agent 身份、跨组织授权、花费风控、分级审批与合规审计。让 AI 在可控边界内操作 Meta 与 TikTok 广告账户，每一次变更都可审批、可追溯、可回滚。</p>
+        <div class="hero-actions">
+          <button class="btn primary" data-runall>运行合规演练</button>
+          <a class="btn" href="#audit">查看审计日志</a>
+        </div>
+        <div class="hero-note">${window.STATIC_DEMO ? '在线预览版：网关逻辑在浏览器内运行，刷新页面数据会重置。' : '本地演示环境。'}所有组织、账户与数据均为虚构。</div>
+      </div>
+      <div class="hero-panel">
+        <div class="hp-title"><span class="live"></span>实时风控概览</div>
+        <div class="hp-row"><span>受管 Agent</span><b>${s.activeAgents} 在线 / ${S.agents.length}</b></div>
+        <div class="hp-row"><span>受管广告账户</span><b>${s.accounts} 个 · 2 个平台</b></div>
+        <div class="hp-row"><span>受管日预算上限</span><b>${usd(managedBudget)}</b></div>
+        <div class="hp-row"><span>网关处理调用</span><b>${s.total}</b></div>
+        <div class="hp-row"><span>已拦截高风险操作</span><b class="bad">${s.denied}</b></div>
+        <div class="hp-row"><span>待人工审批</span><b class="warn">${s.pending}</b></div>
+        <div class="hp-row"><span>拦下的日预算增量</span><b class="good">${usd(s.savedUsd)}</b></div>
+      </div>
     </div>
   </section>
 
-  <div class="stats">
-    <div class="stat"><div class="stat-n">${s.total}</div><div class="stat-l">网关处理的调用</div></div>
-    <div class="stat ok"><div class="stat-n">${s.allowed}</div><div class="stat-l">放行执行</div></div>
-    <div class="stat bad"><div class="stat-n">${s.denied}</div><div class="stat-l">拦截</div></div>
-    <div class="stat warn"><div class="stat-n">${s.pending}</div><div class="stat-l">待人工审批</div></div>
-    <div class="stat money"><div class="stat-n">${usd(s.savedUsd)}</div><div class="stat-l">拦下的日预算增量</div></div>
-    <div class="stat"><div class="stat-n">${s.activeAgents}<small> / ${S.agents.length}</small></div><div class="stat-l">在线 Agent</div></div>
-  </div>
+  <section>
+    <div class="eyebrow dark">核心能力</div>
+    <h2>覆盖 Agent 从接入到追责的全链路治理</h2>
+    <div class="caps">
+      ${CAPABILITIES.map((c) => `
+        <div class="cap">
+          <span class="cap-code">${c.code}</span>
+          <h3>${c.title}</h3>
+          <p>${c.summary}</p>
+          <ul>${c.points.map((p) => `<li>${p}</li>`).join('')}</ul>
+          <a href="#${c.link}" class="cap-link">在演示中查看 →</a>
+        </div>`).join('')}
+    </div>
+  </section>
 
-  <h2>主要满足的需求</h2>
-  <div class="needs">
-    ${NEEDS.map((n, i) => `
-      <div class="need">
-        <div class="need-top"><span class="need-icon">${n.icon}</span><span class="need-no">需求 ${i + 1}</span></div>
-        <h3>${n.title}</h3>
-        <p class="pain"><b>痛点</b>${n.pain}</p>
-        <p class="sol"><b>怎么解决</b>${n.solution}</p>
-        <a href="#${n.link}" class="need-link">${n.linkText} →</a>
+  <section>
+    <div class="eyebrow dark">工作方式</div>
+    <h2>每一次调用都经过同一条控制链</h2>
+    <div class="chain-wrap">
+      <div class="chain-side"><b>AI Agent</b><span>Claude · 自研 Agent · 第三方工具</span><em>只持有网关令牌</em></div>
+      <div class="chain">
+        ${CONTROL_CHAIN.map(([code, label], i) => `
+          <div class="link"><code>${code}</code><span>${label}</span></div>${i < CONTROL_CHAIN.length - 1 ? '<i>→</i>' : ''}`).join('')}
+      </div>
+      <div class="chain-side"><b>广告平台</b><span>${platformTag('meta')} ${platformTag('tiktok')} Amazon、Google 规划中</span><em>凭证集中托管</em></div>
+    </div>
+    <p class="muted small">任一控制项不通过即拦截；命中审批条件时生成审批单，不会执行变更；所有结果写入审计日志。</p>
+  </section>
+
+  <section id="drill">
+    <div class="row-between">
+      <div><div class="eyebrow dark">合规演练</div><h2>${SCENARIOS.length} 个典型风险场景</h2></div>
+      <button class="btn primary" data-runall>运行全部演练</button>
+    </div>
+    <p class="muted">每项演练都是一次真实的网关调用，结果会写入审计日志、审批中心和广告账户。需要重来时，点左下角的「重置演示数据」。</p>
+    ${drillReport()}
+    ${SCENARIO_GROUPS.map((g) => `
+      <div class="drill-group">
+        <div class="dg-head"><h3>${g.title}</h3><span>${g.desc}</span></div>
+        <div class="drills">${SCENARIOS.filter((sc) => sc.group === g.key).map((sc) => `
+          <div class="drill">
+            <div class="drill-main">
+              <div class="drill-tags"><span class="risk risk-${sc.risk}">${RISK[sc.risk]}</span><code class="ctl">${sc.control}</code></div>
+              <h4>${sc.title}</h4>
+              <p>${sc.story}</p>
+              <p class="impact"><b>控制价值</b>${sc.impact}</p>
+              ${renderDrillResult(sc, scenarioResults[sc.key])}
+            </div>
+            <div class="drill-side">
+              <span class="expect">预期 ${badge(sc.expect)}</span>
+              <button class="btn small" data-run="${sc.key}">${scenarioResults[sc.key] ? '再次运行' : '运行'}</button>
+            </div>
+          </div>`).join('')}</div>
       </div>`).join('')}
-  </div>
+  </section>
 
-  <h2>它在哪里工作</h2>
-  <div class="arch">
-    <div class="arch-col">
-      <div class="arch-title">AI Agent</div>
-      <div class="arch-box">Claude / 自研 Agent</div>
-      <div class="arch-box">代理商的投放 Agent</div>
-      <div class="arch-box">第三方工具的 Agent</div>
-      <div class="arch-note">只持有网关 token</div>
+  <section>
+    <div class="eyebrow dark">适用角色</div>
+    <h2>为每个利益相关方解决不同的问题</h2>
+    <div class="roles">
+      ${STAKEHOLDERS.map((r) => `<div class="role-card"><h3>${r.role}</h3><p>${r.value}</p></div>`).join('')}
     </div>
-    <div class="arch-arrow">MCP →</div>
-    <div class="arch-col core">
-      <div class="arch-title">管控网关</div>
-      <div class="arch-step"><b>1</b> 身份认证 · Kill Switch</div>
-      <div class="arch-step"><b>2</b> 资产范围（品牌 → 代理商 → Agent）</div>
-      <div class="arch-step"><b>3</b> 操作权限（角色取交集）</div>
-      <div class="arch-step"><b>4</b> 广告护栏（涨幅 / 总预算 / 频率 / 保护对象）</div>
-      <div class="arch-step"><b>5</b> 超阈值转人工审批</div>
-      <div class="arch-step"><b>6</b> 审计留痕 · 一键回滚</div>
-    </div>
-    <div class="arch-arrow">→</div>
-    <div class="arch-col">
-      <div class="arch-title">广告平台</div>
-      <div class="arch-box">${platformTag('meta')} Meta Ads</div>
-      <div class="arch-box">${platformTag('tiktok')} TikTok Ads</div>
-      <div class="arch-box dim">Amazon Ads（规划中）</div>
-      <div class="arch-box dim">Google Ads（规划中）</div>
-      <div class="arch-note">平台凭证集中托管</div>
-    </div>
-  </div>
+  </section>
 
-  <div class="row-between" id="scenarios">
-    <h2>一键体验典型场景</h2>
-    <button class="btn primary" id="run-all">全部运行</button>
-  </div>
-  <p class="muted">每个场景都是一次真实的网关调用，结果会写进审计日志、审批中心和广告账户。想重来可点左下角「重置演示数据」。</p>
-  <div class="scenarios">
-    ${SCENARIOS.map((sc) => `
-      <div class="scenario">
-        <div class="sc-head">
-          <h3>${sc.title}</h3>
-          <span class="expect">预期：${badge(sc.expect)}</span>
-        </div>
-        <p>${sc.story}</p>
-        <button class="btn small" data-run="${sc.key}">运行</button>
-        <div class="sc-result">${renderResult(scenarioResults[sc.key])}</div>
-      </div>`).join('')}
-  </div>
-
-  <h2>适合谁</h2>
-  <div class="audience">
-    <div class="aud"><h3>出海广告代理商</h3><p>同时为多个品牌投 Meta / TikTok，Agent 花错客户的钱要代理商赔。需要按客户隔离、按角色授权、全程可追溯。</p></div>
-    <div class="aud"><h3>跨境大卖家</h3><p>几十上百个广告账户，内部团队 + 外部代理商 + 各类 AI 工具一起操作，需要统一的规则和审批。</p></div>
-    <div class="aud"><h3>多代理商的品牌方</h3><p>把账户分给不同代理商，想给每家开不同权限、随时收回，并看清每个 Agent 做了什么。</p></div>
-  </div>`;
+  <section>
+    <div class="eyebrow dark">企业就绪度</div>
+    <h2>集成、安全与部署</h2>
+    <p class="muted small"><span class="chip on">演示可体验</span> 当前原型中已实现 &nbsp; <span class="chip">规划中</span> 产品路线图</p>
+    <div class="ready">
+      ${READINESS.map((r) => `
+        <div class="ready-row"><div class="ready-area">${r.area}</div>
+          <div class="ready-items">${r.items.map(([name, on]) => `<span class="chip ${on ? 'on' : ''}">${name}</span>`).join('')}</div>
+        </div>`).join('')}
+    </div>
+  </section>`;
 }
 
 async function runScenario(key) {
@@ -549,9 +662,13 @@ document.addEventListener('click', async (ev) => {
   try {
     if (t.dataset.run) {
       await runScenario(t.dataset.run);
-    } else if (t.id === 'run-all') {
+    } else if (t.dataset.runall !== undefined) {
       for (const sc of SCENARIOS) await runScenario(sc.key);
-      toast('10 个场景已全部运行');
+      await refresh();
+      render();
+      document.getElementById('drill').scrollIntoView({ behavior: 'smooth' });
+      toast(`${SCENARIOS.length} 项合规演练已完成`);
+      return;
     } else if (t.dataset.approve) {
       await api(`/api/approvals/${t.dataset.approve}/approve`, { method: 'POST' });
       toast('已批准，网关已执行变更');

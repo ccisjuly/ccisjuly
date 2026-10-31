@@ -57,6 +57,11 @@ function createState() {
       accounts: ['act_meta_aurora_us', 'act_tt_aurora_us'],
       sponsor: '陈晨（极光市场部）', token: 'agt_tok_inhouse_9a04', status: 'active',
     },
+    {
+      id: 'agt_legacy', name: '历史投放 Agent', orgId: 'agency_voyage', role: 'operator',
+      accounts: ['act_meta_aurora_us'],
+      sponsor: '赵磊（已离职）', token: 'agt_tok_legacy_44c8', status: 'suspended',
+    },
   ];
 
   const basePolicy = {
