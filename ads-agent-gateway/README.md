@@ -63,11 +63,21 @@ claude mcp add --transport http ads-gateway http://localhost:8787/mcp \
 ## 代码结构
 
 ```
-server.js          HTTP 服务：静态页面、管理 API、MCP 接入点
-src/store.js       演示数据（组织、账户、广告系列、授权、Agent、护栏）
-src/gateway.js     网关核心：权限计算、护栏检查、审批、审计、回滚
-public/            管理后台前端（原生 JS，无构建步骤）
-screenshots/       各页面截图
+server.js                HTTP 服务：静态页面、管理 API、MCP 接入点
+src/store.js             演示数据（组织、账户、广告系列、授权、Agent、护栏）
+src/gateway.js           网关核心：权限计算、护栏检查、审批、审计、回滚
+src/api.js               管理 API 路由（服务端和在线预览版共用）
+public/                  管理后台前端（原生 JS，无构建步骤）
+scripts/build-static.js  生成单文件在线预览版 dist/preview.html
+screenshots/             各页面截图
+```
+
+## 单文件预览版
+
+不想启动服务时，可以生成一个单文件版本，网关逻辑直接在浏览器里运行，双击就能打开（不含 MCP 接入点）：
+
+```bash
+node scripts/build-static.js   # 生成 dist/preview.html
 ```
 
 数据保存在内存里，重启服务或点击「重置演示数据」就会恢复初始状态。

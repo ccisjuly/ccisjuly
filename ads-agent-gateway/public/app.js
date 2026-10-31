@@ -1,7 +1,7 @@
 // 管理后台前端：原生 JS + hash 路由，数据全部来自 /api/state。
 
 const NAV = [
-  { path: '', label: '首页', icon: '◎' },
+  { path: 'home', label: '首页', icon: '◎' },
   { path: 'simulator', label: 'Agent 模拟器', icon: '▶' },
   { path: 'approvals', label: '审批中心', icon: '⏸' },
   { path: 'audit', label: '审计日志', icon: '☰' },
@@ -133,7 +133,7 @@ const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = (n) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 const time = (ts) => new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
-const route = () => location.hash.replace(/^#\/?/, '').split('?')[0];
+const route = () => location.hash.replace(/^#\/?/, '').split('?')[0] || 'home';
 const orgName = (id) => S.orgs.find((o) => o.id === id)?.name || id;
 const accName = (id) => S.accounts.find((a) => a.id === id)?.name || id || '-';
 const agentById = (id) => S.agents.find((a) => a.id === id);
@@ -177,7 +177,7 @@ function renderResult(e) {
     <div class="result">
       <div class="result-head">${badge(e.decision)}<span>${esc(e.description)}</span></div>
       ${renderChecks(e.checks)}
-      ${e.decision === 'pending' ? `<div class="hint">已生成审批单 #${e.approvalId}，到 <a href="#/approvals">审批中心</a> 处理。</div>` : ''}
+      ${e.decision === 'pending' ? `<div class="hint">已生成审批单 #${e.approvalId}，到 <a href="#approvals">审批中心</a> 处理。</div>` : ''}
       ${e.result ? `<details><summary>返回给 Agent 的数据</summary><pre>${esc(JSON.stringify(e.result, null, 2))}</pre></details>` : ''}
     </div>`;
 }
@@ -187,12 +187,12 @@ function pageHome() {
   const s = S.stats;
   return `
   <section class="hero">
-    <div class="hero-tag">本地演示原型 · 所有公司和数据均为虚构</div>
+    <div class="hero-tag">${window.STATIC_DEMO ? '在线预览版 · 网关逻辑在浏览器内运行，刷新页面数据会重置' : '本地演示原型'} · 所有公司和数据均为虚构</div>
     <h1>让 AI Agent 安全地操作广告账户</h1>
     <p class="lead">一个放在 Agent 和 Meta / TikTok 广告平台之间的管控网关：每一次改预算、开关广告、新建删除，都先过 <b>权限</b>、<b>预算护栏</b> 和 <b>人工审批</b>，全程留痕，改错了 <b>一键回滚</b>。</p>
     <div class="hero-actions">
       <button class="btn primary" onclick="document.getElementById('scenarios').scrollIntoView({behavior:'smooth'})">一键体验典型场景 ↓</button>
-      <a class="btn" href="#/simulator">打开 Agent 模拟器</a>
+      <a class="btn" href="#simulator">打开 Agent 模拟器</a>
     </div>
   </section>
 
@@ -213,7 +213,7 @@ function pageHome() {
         <h3>${n.title}</h3>
         <p class="pain"><b>痛点</b>${n.pain}</p>
         <p class="sol"><b>怎么解决</b>${n.solution}</p>
-        <a href="#/${n.link}" class="need-link">${n.linkText} →</a>
+        <a href="#${n.link}" class="need-link">${n.linkText} →</a>
       </div>`).join('')}
   </div>
 
@@ -282,7 +282,7 @@ async function runScenario(key) {
 function pageSimulator() {
   return `
   <h1>Agent 模拟器</h1>
-  <p class="muted">模拟某个 Agent 通过网关调用广告工具，查看网关每一步的检查结果。真实场景中 Agent 通过 <a href="#/mcp">MCP 接入点</a> 发起同样的调用。</p>
+  <p class="muted">模拟某个 Agent 通过网关调用广告工具，查看网关每一步的检查结果。真实场景中 Agent 通过 <a href="#mcp">MCP 接入点</a> 发起同样的调用。</p>
   <div class="sim">
     <div class="card">
       <label>以哪个 Agent 的身份调用</label>
@@ -495,7 +495,7 @@ function pageAccounts() {
 
 // ---------- 页面：MCP 接入 ----------
 function pageMcp() {
-  const origin = location.origin;
+  const origin = window.STATIC_DEMO ? 'http://localhost:8787' : location.origin;
   return `
   <h1>MCP 接入</h1>
   <div class="callout">
@@ -524,7 +524,7 @@ function pageMcp() {
 
 // ---------- 路由与事件 ----------
 const PAGES = {
-  '': [pageHome], simulator: [pageSimulator, mountSimulator], approvals: [pageApprovals], audit: [pageAudit],
+  home: [pageHome], simulator: [pageSimulator, mountSimulator], approvals: [pageApprovals], audit: [pageAudit],
   access: [pageAccess], policies: [pagePolicies], accounts: [pageAccounts], mcp: [pageMcp],
 };
 
@@ -532,12 +532,12 @@ function renderNav() {
   const r = route();
   const pending = S.stats.pending;
   $('#nav').innerHTML = NAV.map((n) => `
-    <a href="#/${n.path}" class="${r === n.path ? 'active' : ''}"><span class="ni">${n.icon}</span>${n.label}
+    <a href="#${n.path}" class="${r === n.path ? 'active' : ''}"><span class="ni">${n.icon}</span>${n.label}
       ${n.path === 'approvals' && pending ? `<span class="nb">${pending}</span>` : ''}</a>`).join('');
 }
 
 function render() {
-  const [page, mount] = PAGES[route()] || PAGES[''];
+  const [page, mount] = PAGES[route()] || PAGES.home;
   renderNav();
   $('#app').innerHTML = page();
   if (mount) mount();
@@ -618,7 +618,7 @@ setInterval(async () => {
   const before = S && S.audit.length + S.stats.pending;
   await refresh();
   if (S.audit.length + S.stats.pending !== before) {
-    if (['', 'audit', 'approvals', 'accounts'].includes(route())) render();
+    if (['home', 'audit', 'approvals', 'accounts'].includes(route())) render();
     else renderNav();
   }
 }, 3000);
