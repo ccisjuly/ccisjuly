@@ -1,0 +1,12 @@
+{
+  "name": "ads-agent-gateway",
+  "version": "0.1.0",
+  "description": "广告 Agent 管控网关 · 本地演示原型",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
